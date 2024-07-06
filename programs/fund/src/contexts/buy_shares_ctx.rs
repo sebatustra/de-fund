@@ -5,33 +5,49 @@ use anchor_spl::token::{Token, Mint, TokenAccount};
 use crate::FundAccount;
 
 #[derive(Accounts)]
+#[instruction(usdc_amount: u64)]
 pub struct BuyShares<'info> {
     #[account(
         mut,
         seeds = [b"fund".as_ref()],
         bump,
     )]
-    pub fund : Account<'info, FundAccount>,
+    pub fund : Box<Account<'info, FundAccount>>,
 
     #[account(
+        mut,
         seeds = [b"mint".as_ref()],
         bump,
     )]
-    pub token_mint: Account<'info, Mint>,
-
-    #[account(
-        seeds = [b"fund_vault".as_ref()],
-        bump,
-    )]
-    pub fund_vault: Box<Account<'info, TokenAccount>>,
+    pub fund_token_mint: Box<Account<'info, Mint>>,
 
     #[account(
         init_if_needed,
         payer = buyer,
-        associated_token::mint = token_mint,
+        associated_token::mint = fund_token_mint,
         associated_token::authority = buyer
     )]
-    pub buyer_fund_token_account: Account<'info, TokenAccount>,
+    pub buyer_fund_token_account: Box<Account<'info, TokenAccount>>,
+
+    #[account(
+        mut,
+    )]
+    pub usdc_mint: Box<Account<'info, Mint>>,
+
+    #[account(
+        mut,
+        seeds = [b"fund_usdc_vault".as_ref()],
+        bump,
+    )]
+    pub fund_usdc_vault: Box<Account<'info, TokenAccount>>,
+
+    #[account(
+        mut,
+        constraint = buyer_usdc_token_account.owner == *buyer.key,
+        constraint = buyer_usdc_token_account.mint == usdc_mint.key(),
+        constraint = buyer_usdc_token_account.amount >= usdc_amount
+    )]
+    pub buyer_usdc_token_account: Box<Account<'info, TokenAccount>>,
     
     #[account(mut)]
     pub buyer: Signer<'info>,

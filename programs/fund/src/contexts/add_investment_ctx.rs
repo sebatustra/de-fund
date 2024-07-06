@@ -11,7 +11,7 @@ pub struct AddInvestment<'info> {
         bump,
         constraint = fund.manager == *manager.key
     )]
-    pub fund : Account<'info, FundAccount>,
+    pub fund : Box<Account<'info, FundAccount>>,
 
     #[account(
         init,
@@ -20,12 +20,10 @@ pub struct AddInvestment<'info> {
         payer = manager,
         space = InvestmentAccount::get_len(&identifier)
     )]
-    pub investment: Account<'info, InvestmentAccount>,
+    pub investment: Box<Account<'info, InvestmentAccount>>,
 
     #[account(mut)]
     pub manager: Signer<'info>,
 
     pub system_program: Program<'info, System>,
-
-    pub rent: Sysvar<'info, Rent>,
 }

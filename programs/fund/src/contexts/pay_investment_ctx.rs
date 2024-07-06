@@ -10,19 +10,17 @@ pub struct PayInvestment<'info> {
         bump,
         constraint = fund.manager == *manager.key
     )]
-    pub fund : Account<'info, FundAccount>,
+    pub fund : Box<Account<'info, FundAccount>>,
 
     #[account(
         mut,
         seeds = [b"investment".as_ref(), identifier.as_bytes()],
         bump,
     )]
-    pub investment: Account<'info, InvestmentAccount>,
+    pub investment: Box<Account<'info, InvestmentAccount>>,
 
     #[account(mut)]
     pub manager: Signer<'info>,
 
     pub system_program: Program<'info, System>,
-
-    pub rent: Sysvar<'info, Rent>,
 }

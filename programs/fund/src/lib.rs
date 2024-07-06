@@ -16,14 +16,15 @@ pub mod fund {
 
     pub fn initialize_fund(
         ctx: Context<InitializeFund>,
-        initial_investment: i64,
+        initial_investment: u64,
         initial_shares: u64
     ) -> Result<()> {
         let fund_account = &mut ctx.accounts.fund;
         fund_account.set_inner(FundAccount {
             manager: *ctx.accounts.manager.key,
-            token_mint: ctx.accounts.token_mint.key(),
-            fund_vault: ctx.accounts.fund_vault.key(),
+            fund_token_mint: ctx.accounts.fund_token_mint.key(),
+            fund_shares_vault: ctx.accounts.fund_shares_vault.key(),
+            usdc_vault: None,
             total_value: initial_investment,
             total_shares: initial_shares
         });
@@ -32,8 +33,8 @@ pub mod fund {
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(), 
                 token::MintTo {
-                    mint: ctx.accounts.token_mint.to_account_info(),
-                    to: ctx.accounts.fund_vault.to_account_info(),
+                    mint: ctx.accounts.fund_token_mint.to_account_info(),
+                    to: ctx.accounts.fund_shares_vault.to_account_info(),
                     authority: ctx.accounts.fund.to_account_info()
                 }, 
                 &[&[
@@ -43,6 +44,16 @@ pub mod fund {
             ),
             initial_shares
         )?;
+
+        Ok(())
+    }
+
+    pub fn initialize_usdc_vault(
+        ctx: Context<InitializeUSDCVault>
+    ) -> Result<()> {
+
+        let fund_account = &mut ctx.accounts.fund;
+        fund_account.usdc_vault = Some(ctx.accounts.usdc_vault.key());
 
         Ok(())
     }
@@ -65,7 +76,7 @@ pub mod fund {
         });
 
         let fund_account = &mut ctx.accounts.fund;
-        fund_account.total_value = fund_account.total_value.checked_add(investment_amount).unwrap();
+        fund_account.total_value = fund_account.total_value.checked_add(investment_amount.try_into().unwrap()).unwrap();
 
         Ok(())
     }
@@ -82,32 +93,74 @@ pub mod fund {
         investment.payment_amount = Some(payment_amount);
         investment.is_active = false;
 
-        let final_balance = payment_amount.checked_sub(investment.investment_amount).unwrap();
+        let final_balance = payment_amount.checked_sub(investment.investment_amount)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
 
         let fund_account = &mut ctx.accounts.fund;
-        fund_account.total_value = fund_account.total_value.checked_add(final_balance).unwrap();
+
+        if final_balance >= 0 {
+            let final_balance = final_balance as u64;
+            fund_account.total_value = fund_account.total_value
+                .checked_add(final_balance)
+                .ok_or(ProgramError::ArithmeticOverflow)?;
+        } else {
+            let balance_abs_u64 = final_balance.abs() as u64;
+            fund_account.total_value = fund_account.total_value
+                .checked_sub(balance_abs_u64)
+                .ok_or(ProgramError::ArithmeticOverflow)?;
+        }
 
         Ok(())
     }
 
     pub fn buy_shares(
         ctx: Context<BuyShares>,
-        USDC_invested: u64
+        usdc_amount: u64
     ) -> Result<()> {
 
         let fund_account = &mut ctx.accounts.fund;
 
-        let share_value = fund_account.total_value.checked_div(fund_account.total_shares.try_into().unwrap()).unwrap();
+        let current_share_value = 
+            fund_account.total_value / fund_account.total_shares;
 
-        let new_shares = USDC_invested.checked_div(share_value.try_into().unwrap()).unwrap() ;
+        let shares_to_issue = 
+            usdc_amount / current_share_value;
 
-        fund_account.total_value = fund_account.total_value.checked_add(USDC_invested.try_into().unwrap()).unwrap();
+        fund_account.total_shares = fund_account.total_shares
+            .checked_add(shares_to_issue)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
 
+        fund_account.total_value = fund_account.total_value
+            .checked_add(usdc_amount)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
 
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(), 
+                token::Transfer {
+                    from: ctx.accounts.buyer_usdc_token_account.to_account_info(),
+                    to: ctx.accounts.fund_usdc_vault.to_account_info(),
+                    authority: ctx.accounts.buyer.to_account_info()
+                }
+            ), 
+            usdc_amount
+        )?;
 
-
-
-
+        token::mint_to(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                token::MintTo {
+                    mint: ctx.accounts.fund_token_mint.to_account_info(),
+                    to: ctx.accounts.buyer_fund_token_account.to_account_info(),
+                    authority: ctx.accounts.fund.to_account_info()
+                }, 
+                &[&[
+                    "fund".as_bytes(),
+                    &[ctx.bumps.fund]
+                ]]
+            ),
+            shares_to_issue
+        )?;
 
         Ok(())
     }

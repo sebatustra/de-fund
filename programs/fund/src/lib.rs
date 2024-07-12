@@ -7,7 +7,7 @@ mod contexts;
 use contexts::*;
 use states::*;
 
-declare_id!("FXvCybtDJeNSAKGAQhBujXQWp3ab61ReP84EFpyYFe4r");
+declare_id!("6vUjvBGWETdE4duVqQBeu4WLCC3XgDkCmzhx4aCC7V4g");
 
 #[program]
 pub mod fund {

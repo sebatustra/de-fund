@@ -5,14 +5,17 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-fund = "FXvCybtDJeNSAKGAQhBujXQWp3ab61ReP84EFpyYFe4r"
+fund = "6vUjvBGWETdE4duVqQBeu4WLCC3XgDkCmzhx4aCC7V4g"
+
+[programs.devnet]
+fund = "6vUjvBGWETdE4duVqQBeu4WLCC3XgDkCmzhx4aCC7V4g"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
-wallet = "~/.config/solana/id.json"
+cluster = "Devnet"
+wallet = "/home/sebatustra/my-solana-wallet/my-keypair.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
